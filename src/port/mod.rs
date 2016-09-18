@@ -72,6 +72,12 @@ struct PinCallbacks {
     low: Option<Complete<bool>>,
 }
 
+impl PinCallbacks {
+    fn clear(&mut self) {
+        *self = PinCallbacks::default()
+    }
+}
+
 struct ReadingFuture {
     stream: Rc<UnixStream>,
     callbacks: Rc<RefCell<[PinCallbacks; 8]>>,
@@ -122,7 +128,20 @@ impl Future for ReadingFuture {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             let mut state = mem::replace(&mut self.state, ReadState::Waiting);
-            let count = try_nb!((&*self.stream).read(&mut self.buf));
+            let count = match (&*self.stream).read(&mut self.buf) {
+                Ok(t) => t,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    println!("Err Block");
+                    return Ok(::futures::Async::NotReady)
+                }
+                Err(e) => {
+                    return Err(e.into());
+                }
+            };
+            if count == 0 {
+                return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Socket closed"));
+            }
+
             let mut buf = &self.buf[..count];
             while ! buf.is_empty() {
                 state = match state {
@@ -132,7 +151,7 @@ impl Future for ReadingFuture {
                         match byte {
                             raw::reply::ASYNC_UART_RX => ReadState::AsyncDataStart,
                             n if n >= raw::reply::ASYNC_PIN_CHANGE_N && n < (raw::reply::ASYNC_PIN_CHANGE_N + 16) => {
-                                let pin = n & !(0x8);
+                                let pin = (n - raw::reply::ASYNC_PIN_CHANGE_N) & !(0x8);
                                 let value = n & 0x8 != 0;
                                 self.handle_pin_interrupt(pin, value);
                                 ReadState::Waiting
@@ -193,6 +212,16 @@ impl Future for ReadingFuture {
                 }
             }
             self.state = state;
+        }
+    }
+}
+
+impl Drop for ReadingFuture {
+    fn drop(&mut self) {
+        self.requests.borrow_mut().clear();
+        let mut callbacks = self.callbacks.borrow_mut();
+        for cb in callbacks.iter_mut() {
+            cb.clear();
         }
     }
 }

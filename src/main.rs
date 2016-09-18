@@ -1,5 +1,20 @@
 extern crate tessel_raw;
+extern crate tokio_core;
+extern crate futures;
+
+use futures::Future;
+use futures::stream::Stream;
+
+use tokio_core::reactor::{Core};
 
 fn main() {
+    let mut reactor = Core::new().unwrap();
+    let port = tessel_raw::port::Port::connect("/tmp/tessel_sock.socket",
+                                               &reactor.handle()).unwrap();
+    let future = port.pin_changes(3).take(5).for_each(|b| {
+        println!("pin changed to {}", b);
+        Ok(())
+    });
 
+    println!("{:?}", reactor.run(future));
 }
