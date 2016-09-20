@@ -1,8 +1,10 @@
 use super::raw;
 use super::Port;
+use super::I2cPort;
 use super::ReadRequest;
 
 use std::io;
+use std::io::prelude::*;
 
 use futures;
 use futures::{Future, Poll, Async, Oneshot};
@@ -78,7 +80,7 @@ impl<'a> PinChanges<'a> {
             pin: pin,
             state: PinChangesState::Writing(
                 tokio_io::write_all(&*port.stream,
-                                     [raw::cmd::GPIO_INT, pin | raw::interrupt_mode::change << 4])
+                                     [raw::cmd::GPIO_INT, pin | raw::interrupt_mode::CHANGE << 4])
             ),
         }
     }
@@ -180,5 +182,37 @@ impl<'a> Future for I2cRead<'a> {
         let result = rx.poll().map_err(|_| io::Error::new(io::ErrorKind::Other, "Oneshot was closed"));
         self.state = I2cReadState::Waiting(rx);
         result
+    }
+}
+
+pub struct I2cPortFuture {
+    port: Option<Port>,
+    baud: u8,
+    bytes_written: u8,
+}
+
+impl I2cPortFuture {
+    pub fn new(port: Port, baud: u8) -> I2cPortFuture {
+        I2cPortFuture {
+            port: Some(port),
+            baud: baud,
+            bytes_written: 0,
+        }
+    }
+}
+
+impl Future for I2cPortFuture {
+    type Item = I2cPort;
+    type Error = io::Error;
+    fn poll(&mut self) -> Poll<I2cPort, io::Error> {
+        while self.bytes_written < 2 {
+            let data = [raw::cmd::ENABLE_I2C, self.baud];
+            let port = self.port.as_mut().expect("Poll after return");
+            self.bytes_written += 
+                try_nb!((&*port.stream).write(&data[self.bytes_written as usize..])) as u8
+        }
+        Ok(Async::Ready(I2cPort::new(
+            self.port.take().expect("Poll after return")
+        )))
     }
 }

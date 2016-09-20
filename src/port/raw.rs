@@ -48,9 +48,9 @@ pub mod reply {
 
 #[allow(dead_code)]
 pub mod interrupt_mode {
-    pub const rise: u8 = 1;
-    pub const fall: u8 = 2;
-    pub const change: u8 = 3;
-    pub const high: u8 = 4;
-    pub const low: u8 = 5;
+    pub const RISE: u8 = 1;
+    pub const FALL: u8 = 2;
+    pub const CHANGE: u8 = 3;
+    pub const HIGH: u8 = 4;
+    pub const LOW: u8 = 5;
 }
