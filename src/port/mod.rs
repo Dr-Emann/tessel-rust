@@ -47,17 +47,11 @@ impl Port {
         Ok(port)
     }
 
-    pub fn gpio_digital_write(&self, pin: u8, value: bool) -> tokio_io::WriteAll<&UnixStream, [u8; 2]> {
-        let cmd = if value { raw::cmd::GPIO_HIGH } else { raw::cmd::GPIO_LOW };
-        tokio_io::write_all(&*self.stream, [cmd, pin])
-    }
-
-    pub fn gpio_digital_read(&self, pin: u8) -> PinRead {
-        PinRead::new(self, pin)
-    }
-
-    pub fn pin_changes(&self, pin: u8) -> PinChanges {
-        PinChanges::new(self, pin)
+    pub fn pin(&self, idx: u8) -> DigitalGpioPin {
+        DigitalGpioPin {
+            port: self,
+            idx: idx,
+        }
     }
 
     pub fn into_i2c(self, frequency: u32) -> I2cPortFuture {
@@ -66,6 +60,30 @@ impl Port {
 
     pub fn i2c_read(&self, address: u8, len: u8) -> I2cRead {
         I2cRead::new(self, address, len)
+    }
+
+    fn stream(&self) -> &UnixStream {
+        &*self.stream
+    }
+}
+
+pub struct DigitalGpioPin<'a> {
+    port: &'a Port,
+    idx: u8,
+}
+
+impl<'a> DigitalGpioPin<'a> {
+    pub fn write(&self, value: bool) -> tokio_io::WriteAll<&UnixStream, [u8; 2]> {
+        let cmd = if value { raw::cmd::GPIO_HIGH } else { raw::cmd::GPIO_LOW };
+        tokio_io::write_all(self.port.stream(), [cmd, self.idx])
+    }
+
+    pub fn read(&self) -> PinRead {
+        PinRead::new(self.port, self.idx)
+    }
+
+    pub fn changes(&self) -> PinChanges {
+        PinChanges::new(self.port, self.idx)
     }
 }
 

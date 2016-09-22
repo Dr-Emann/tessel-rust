@@ -12,7 +12,8 @@ fn main() {
     let port = tessel_raw::port::Port::connect("/tmp/tessel_sock.socket",
                                                &reactor.handle()).unwrap();
     {
-        let future = port.pin_changes(3).take(5).for_each(|b| {
+        let pin = port.pin(3);
+        let future = pin.changes().take(5).for_each(|b| {
             println!("pin changed to {}", b);
             Ok(())
         });
