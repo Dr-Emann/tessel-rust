@@ -1,4 +1,4 @@
-use std::{cmp, mem, io};
+use std::{cmp, fmt, mem, io};
 use std::io::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -122,6 +122,7 @@ impl Future for Loop {
                     ReadState::AsyncData(mut data, mut offset) => {
                         let avail_len = cmp::min(data.len() - offset, buf.len());
                         data[offset..offset + avail_len].copy_from_slice(&buf[0..avail_len]);
+                        buf = &buf[avail_len..];
                         offset += avail_len;
                         if offset == data.len() {
                             // Send future
@@ -133,6 +134,7 @@ impl Future for Loop {
                     ReadState::ReplyData(mut data, mut offset, completion) => {
                         let avail_len = cmp::min(data.len() - offset, buf.len());
                         data[offset..offset + avail_len].copy_from_slice(&buf[0..avail_len]);
+                        buf = &buf[avail_len..];
                         offset += avail_len;
                         if offset == data.len() {
                             completion.complete(data);
@@ -164,4 +166,17 @@ enum ReadState {
     AsyncDataStart,
     AsyncData(Box<[u8]>, usize),
     ReplyData(Box<[u8]>, usize, Complete<Box<[u8]>>),
+}
+
+impl fmt::Debug for ReadState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::ReadState::*;
+        match *self {
+            Missing => write!(f, "Missing"),
+            Waiting => write!(f, "Waiting"),
+            AsyncDataStart => write!(f, "AsyncDataStart"),
+            AsyncData(ref data, len) => write!(f, "AsyncData({} of {})", len, data.len()),
+            ReplyData(ref data, len, _) => write!(f, "ReplyData({} of {})", len, data.len()),
+        }
+    }
 }

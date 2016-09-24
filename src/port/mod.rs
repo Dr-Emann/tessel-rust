@@ -58,10 +58,6 @@ impl Port {
         I2cPortFuture::new(self, I2cPort::compute_baud(frequency))
     }
 
-    pub fn i2c_read(&self, address: u8, len: u8) -> I2cRead {
-        I2cRead::new(self, address, len)
-    }
-
     fn stream(&self) -> &UnixStream {
         &*self.stream
     }
@@ -105,6 +101,10 @@ impl I2cPort {
         } else {
             panic!("invalid frequency");
         }
+    }
+
+    pub fn read(&self, address: u8, len: u8) -> I2cRead {
+        I2cRead::new(&self.port, address, len)
     }
 }
 

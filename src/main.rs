@@ -11,16 +11,7 @@ fn main() {
     let mut reactor = Core::new().unwrap();
     let port = tessel_raw::port::Port::connect("/tmp/tessel_sock.socket",
                                                &reactor.handle()).unwrap();
-    {
-        let pin = port.pin(3);
-        let future = pin.changes().take(5).for_each(|b| {
-            println!("pin changed to {}", b);
-            Ok(())
-        });
-
-        println!("{:?}", reactor.run(future));
-    }
     let future = port.into_i2c(100_000);
-    let i2c_port = reactor.run(future);
-
+    let i2c_port = reactor.run(future).unwrap();
+    println!("{:?}", reactor.run(i2c_port.read(5, 4)));
 }
